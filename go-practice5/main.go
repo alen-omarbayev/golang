@@ -14,7 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Book модель ответа
+
 type Book struct {
 	ID     int    `json:"id"`
 	Title  string `json:"title"`
@@ -26,7 +26,6 @@ type Book struct {
 var db *pgxpool.Pool
 
 func main() {
-	// Коннекшн строка берём из env или используем дефолт
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		dsn = "postgres://postgres:password@localhost:5432/library?sslmode=disable"
@@ -50,15 +49,15 @@ func main() {
 }
 
 func getBooksHandler(w http.ResponseWriter, r *http.Request) {
-	// Parse query params
+	
 	q := r.URL.Query()
 
 	genre := strings.TrimSpace(q.Get("genre"))
-	sortParam := strings.TrimSpace(q.Get("sort")) // allowed: price_asc, price_desc
+	sortParam := strings.TrimSpace(q.Get("sort")) 
 	limitStr := q.Get("limit")
 	offsetStr := q.Get("offset")
 
-	// defaults
+
 	limit := 10
 	offset := 0
 	if limitStr != "" {
@@ -72,46 +71,46 @@ func getBooksHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// safety cap on limit to avoid huge responses
+	
 	const maxLimit = 100
 	if limit > maxLimit {
 		limit = maxLimit
 	}
 
-	// Build SQL dynamically but use bound parameters ($1, $2, ...)
+	
 	var sb strings.Builder
 	sb.WriteString("SELECT id, title, author, genre, price FROM books")
 	args := make([]any, 0, 4)
 	argPos := 1
 
-	// conditions
+	
 	if genre != "" {
 		sb.WriteString(fmt.Sprintf(" WHERE genre = $%d", argPos))
 		args = append(args, genre)
 		argPos++
 	}
 
-	// sorting
+	
 	if sortParam == "price_asc" {
 		sb.WriteString(" ORDER BY price ASC")
 	} else if sortParam == "price_desc" {
 		sb.WriteString(" ORDER BY price DESC")
 	}
 
-	// pagination — LIMIT OFFSET
+	
 	sb.WriteString(fmt.Sprintf(" LIMIT $%d OFFSET $%d", argPos, argPos+1))
 	args = append(args, limit, offset)
 
 	query := sb.String()
 
-	// Execute and measure time
+	
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	rows, err := db.Query(ctx, query, args...)
 	elapsed := time.Since(start)
-	// Log and set header regardless of error (but if error, still return)
+	
 	w.Header().Set("X-Query-Time", fmt.Sprintf("%dms", elapsed.Milliseconds()))
 	log.Printf("query took %s; sql=%q; args=%v", elapsed, query, args)
 
@@ -139,7 +138,7 @@ func getBooksHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	// Encode response
+
 	if err := json.NewEncoder(w).Encode(books); err != nil {
 		log.Printf("failed to encode response: %v", err)
 	}
